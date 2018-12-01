@@ -7,17 +7,29 @@ pool:
 
 variables:
   buildConfiguration: 'Release'
-  sln: './docker-fixtures.sln'
-  tests: './src/Tests/DockerFixtures.Tests/DockerFixtures.Tests.csproj'
+  sln: '$(Build.SourcesDirectory)/docker-fixtures.sln'
+  tests: '$(Build.SourcesDirectory)/src/Tests/DockerFixtures.Tests/DockerFixtures.Tests.csproj'
 
 steps:
 - script: dotnet build --configuration $(buildConfiguration) $(sln)
   displayName: 'dotnet build $(buildConfiguration)'
-- script: dotnet test $(tests) --logger "xunit;LogFileName=TestResults.xml"
+- script: dotnet test $(tests) --logger "xunit;LogFileName=TestResults.xml" /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
   displayName: 'dotnet test'
 - task: PublishTestResults@2
-  displayName: 'publish test results to azure pipelines'
+  displayName: 'Publish test results'
   inputs:
     testResultsFormat: 'xUnit'
     testResultsFiles: '**/TestResults.xml'
   condition: always()
+- script: |
+    dotnet tool install dotnet-reportgenerator-globaltool --version 4.0.3 --tool-path .tools
+    ./.tools/reportgenerator "-reports:$(Build.SourcesDirectory)/**/coverage.cobertura.xml" "-targetdir:$(Build.SourcesDirectory)/CodeCoverageReport" "-reporttypes:HTMLInline;HTMLChart"
+  displayName: Generate code coverage report
+- task: PublishCodeCoverageResults@1
+  displayName: Publish code coverage report
+  enabled: true
+  inputs:
+    codeCoverageTool: Cobertura
+    summaryFileLocation: '$(Build.SourcesDirectory)/**/CodeCoverage/coverage.cobertura.xml'
+    reportDirectory: '$(Build.SourcesDirectory)/CodeCoverageReport'
+    additionalCodeCoverageFiles: '$(Build.SourcesDirectory)/CodeCoverageReport/index.html'
