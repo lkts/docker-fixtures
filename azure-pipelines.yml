@@ -7,13 +7,14 @@ pool:
 
 variables:
   buildConfiguration: 'Release'
-  sln: './docker-fixtures.sln'
-  tests: './src/Tests/DockerFixtures.Tests/DockerFixtures.Tests.csproj'
+  sln: '$(Build.SourcesDirectory)/docker-fixtures.sln'
+  tests: '$(Build.SourcesDirectory)/src/Tests/DockerFixtures.Tests/DockerFixtures.Tests.csproj'
+  coverage: '$(Build.SourcesDirectory)/results/coverage.cobertura.xml'
 
 steps:
 - script: dotnet build --configuration $(buildConfiguration) $(sln)
   displayName: 'dotnet build $(buildConfiguration)'
-- script: dotnet test $(tests) --logger "xunit;LogFileName=TestResults.xml"
+- script: dotnet test $(tests) --logger "xunit;LogFileName=TestResults.xml" /p:CollectCoverage=true /p:CoverletOutput=$(coverage) /p:CoverletOutputFormat=cobertura
   displayName: 'dotnet test'
 - task: PublishTestResults@2
   displayName: 'publish test results to azure pipelines'
@@ -21,3 +22,8 @@ steps:
     testResultsFormat: 'xUnit'
     testResultsFiles: '**/TestResults.xml'
   condition: always()
+- task: PublishCodeCoverageResults@1
+  inputs:
+    summaryFileLocation: $(coverage)
+    codecoverageTool: cobertura
+    failIfCoverageEmpty: true
