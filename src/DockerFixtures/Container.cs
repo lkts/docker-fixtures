@@ -1,11 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Docker.DotNet;
 using Docker.DotNet.Models;
+using DockerFixtures.Exceptions;
 using DockerFixtures.Infrastructure;
 using Polly;
 
@@ -19,6 +19,8 @@ namespace DockerFixtures
         
         private readonly ContainerState _unknownState = new ContainerState();
         
+        private string _containerId;
+        
         private ContainerInspectResponse _containerInspectResponse;
 
         public ContainerState State => _containerInspectResponse?.State ?? _unknownState;
@@ -27,24 +29,29 @@ namespace DockerFixtures
         {
             PublishAllPorts = true     
         };
-
-        private string ContainerId { get; set; }
         
         /// <summary>
         /// Docker image name
         /// </summary>
-        public string ImageName { get; set; }
+        public string ImageName { get; }
         
         /// <summary>
         /// Ports exposed by container
         /// </summary>
-        public int[] ExposedPorts { get; set; }
-        public (string key, string value)[] EnvironmentVariables { get; set; }
+        public int[] ExposedPorts { get; }
+
+        public (string key, string value)[] EnvironmentVariables { get; }
         
-        public string[] Commands { get; set; }
+        public string[] Commands { get; }
         
-        public Container() =>
+        public Container()
+        {
             _dockerClient = DockerClientFactory.GetClient();
+            
+            ExposedPorts = new int[0];
+            Commands = new string[0];
+            EnvironmentVariables = new (string key, string value)[0];
+        }
 
         public Container(string imageName)
             : this()
@@ -57,7 +64,7 @@ namespace DockerFixtures
         
         public async Task StartAsync()
         {
-            ContainerId = await Create();
+            _containerId = await Create();
             await TryStart();
         }
 
@@ -66,20 +73,17 @@ namespace DockerFixtures
             var progress = new Progress<string>(m =>
             {
                 Debug.WriteLine(m);
-
-                // Debug.WriteLineIf(m.Error != null, m.ErrorMessage);
             });
 
-            var started = await _dockerClient.Containers.StartContainerAsync(ContainerId, new ContainerStartParameters());
+            var started = await _dockerClient.Containers.StartContainerAsync(_containerId, new ContainerStartParameters());
 
             if(started)
             {
-                await _dockerClient.Containers.GetContainerLogsAsync(ContainerId, new ContainerLogsParameters
+                await _dockerClient.Containers.GetContainerLogsAsync(_containerId, new ContainerLogsParameters
                 {
                     ShowStderr = true,
                     ShowStdout = true,
                 }, default(CancellationToken), progress: progress);
-
             }
 
             await WaitUntilContainerStarted();
@@ -94,10 +98,10 @@ namespace DockerFixtures
             var containerInspectPolicy = await Policy
                 .TimeoutAsync(_startTimeout)
                 .WrapAsync(retryUntilContainerStateIsRunning)
-                .ExecuteAndCaptureAsync(async () => _containerInspectResponse = await _dockerClient.Containers.InspectContainerAsync(ContainerId));
+                .ExecuteAndCaptureAsync(async () => _containerInspectResponse = await _dockerClient.Containers.InspectContainerAsync(_containerId));
 
             if (containerInspectPolicy.Outcome == OutcomeType.Failure)
-                throw new Exception("Container startup failed", containerInspectPolicy.FinalException);
+                throw new ContainerException("Container startup failed", containerInspectPolicy.FinalException);
         }
 
         private async Task<string> Create()
@@ -132,13 +136,11 @@ namespace DockerFixtures
 
         private CreateContainerParameters ApplyConfiguration()
         {
-            var exposedPorts = ExposedPorts?.ToList() ?? new List<int>();
-
             var cfg = new Config
             {
                 Image = ImageName,
-                Env = EnvironmentVariables?.Select(ev => $"{ev.key}={ev.value}").ToList(),
-                ExposedPorts = exposedPorts.ToDictionary(e => $"{e}/tcp", e => default(EmptyStruct)),
+                Env = EnvironmentVariables.Select(ev => $"{ev.key}={ev.value}").ToList(),
+                ExposedPorts = ExposedPorts.ToDictionary(e => $"{e}/tcp", e => default(EmptyStruct)),
                 Tty = true,
                 Cmd = Commands,
                 AttachStderr = true,
@@ -153,7 +155,7 @@ namespace DockerFixtures
         
         public async Task StopAsync()
         {
-            if (string.IsNullOrWhiteSpace(ContainerId)) 
+            if (string.IsNullOrWhiteSpace(_containerId)) 
                 return;
 
             var stopped = await _dockerClient.Containers.StopContainerAsync(_containerInspectResponse.ID, new ContainerStopParameters());
