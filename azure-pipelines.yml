@@ -22,7 +22,6 @@ steps:
   inputs:
     testResultsFormat: 'xUnit'
     testResultsFiles: '**/TestResults.xml'
-  condition: always()
 - script: |
     dotnet tool install dotnet-reportgenerator-globaltool --version 4.0.3 --tool-path .tools
     ./.tools/reportgenerator "-reports:$(coverageResults)/**/coverage.cobertura.xml" "-targetdir:$(coverageResults)/Reports" "-reporttypes:HtmlInline_AzurePipelines;HTMLChart;Cobertura"
@@ -32,5 +31,5 @@ steps:
   enabled: true
   inputs:
     codeCoverageTool: Cobertura
-    summaryFileLocation: '$(coverageResults)/Cobertura.xml'
+    summaryFileLocation: '$(coverageResults)/Reports/Cobertura.xml'
     reportDirectory: '$(coverageResults)/Reports'
