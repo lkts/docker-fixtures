@@ -14,10 +14,10 @@ variables:
 
 steps:
 - script: dotnet build --configuration $(buildConfiguration) $(sln)
-  displayName: 'dotnet build $(buildConfiguration)'
+  displayName: 'Build'
 
 - script: dotnet test $(tests) --logger "xunit;LogFileName=TestResults.xml" /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
-  displayName: 'dotnet test'
+  displayName: 'Run tests'
 
 - task: PublishTestResults@2
   displayName: 'Publish test results'
@@ -26,6 +26,7 @@ steps:
     testResultsFiles: '**/TestResults.xml'
 
 - script: |
+    echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections
     sudo apt-get install ttf-mscorefonts-installer
     sudo fc-cache
     dotnet tool install dotnet-reportgenerator-globaltool --version 4.0.3 --tool-path $(toolsPath)
