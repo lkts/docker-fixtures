@@ -26,7 +26,7 @@ steps:
   condition: always()
 - script: |
     dotnet tool install dotnet-reportgenerator-globaltool --version 4.0.3 --tool-path .tools
-    ./.tools/reportgenerator "-reports:$(Build.SourcesDirectory)/**/coverage.cobertura.xml" "-targetdir:$(coverageResults)" "-reporttypes:HTMLInline;HTMLChart"
+    ./.tools/reportgenerator "-reports:$(coverageSummary)" "-targetdir:$(coverageResults)" "-reporttypes:HTMLInline;HTMLChart"
   displayName: Generate code coverage report
 - task: PublishCodeCoverageResults@1
   displayName: Publish code coverage report
