@@ -8,22 +8,32 @@ pool:
 variables:
   buildConfiguration: 'Release'
   sln: '$(Build.SourcesDirectory)/docker-fixtures.sln'
-  tests: '$(Build.SourcesDirectory)/src/Tests/DockerFixtures.Tests/DockerFixtures.Tests.csproj'
-  coverage: '$(Build.SourcesDirectory)/results/coverage.cobertura.xml'
+  toolsPath: '$(Build.SourcesDirectory)/.tools'
+  tests: '$(Build.SourcesDirectory)/src/Tests/DockerFixtures.Tests/DockerFixtures.Tests.csproj'  
+  coverageResults: '$(Build.SourcesDirectory)/reports/coverage'
 
 steps:
 - script: dotnet build --configuration $(buildConfiguration) $(sln)
   displayName: 'dotnet build $(buildConfiguration)'
-- script: dotnet test $(tests) --logger "xunit;LogFileName=TestResults.xml" /p:CollectCoverage=true /p:CoverletOutput=$(coverage) /p:CoverletOutputFormat=cobertura
+
+- script: dotnet test $(tests) --logger "xunit;LogFileName=TestResults.xml" /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
   displayName: 'dotnet test'
+
 - task: PublishTestResults@2
-  displayName: 'publish test results to azure pipelines'
+  displayName: 'Publish test results'
   inputs:
     testResultsFormat: 'xUnit'
     testResultsFiles: '**/TestResults.xml'
-  condition: always()
+
+- script: |
+    dotnet tool install dotnet-reportgenerator-globaltool --version 4.0.3 --tool-path $(toolsPath)
+    $(toolsPath)/reportgenerator "-reports:$(Build.SourcesDirectory)/**/coverage.cobertura.xml" "-targetdir:$(coverageResults)" "-reporttypes:HtmlInline_AzurePipelines;Cobertura;Badges"
+  displayName: Generate code coverage report
+
 - task: PublishCodeCoverageResults@1
+  displayName: Publish code coverage results
+  enabled: true
   inputs:
-    summaryFileLocation: $(coverage)
-    codecoverageTool: cobertura
-    failIfCoverageEmpty: true
+    codeCoverageTool: Cobertura
+    summaryFileLocation: '$(coverageResults)/Cobertura.xml'
+    reportDirectory: '$(coverageResults)'
