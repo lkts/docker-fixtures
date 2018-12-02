@@ -8,28 +8,30 @@ pool:
 variables:
   buildConfiguration: 'Release'
   sln: '$(Build.SourcesDirectory)/docker-fixtures.sln'
-  tests: '$(Build.SourcesDirectory)/src/Tests/DockerFixtures.Tests/DockerFixtures.Tests.csproj'
-  artifacts: '$(Build.SourcesDirectory)/Artifacts'
-  coverageResults: '$(artifacts)/Coverage/'
+  toolsPath: '$(Build.SourcesDirectory)/.tools'
+  tests: '$(Build.SourcesDirectory)/src/Tests/DockerFixtures.Tests/DockerFixtures.Tests.csproj'  
+  coverageResults: '$(Build.SourcesDirectory)/reports/coverage'
 
 steps:
 - script: dotnet build --configuration $(buildConfiguration) $(sln)
   displayName: 'dotnet build $(buildConfiguration)'
-- script: dotnet test $(tests) --logger "xunit;LogFileName=TestResults.xml" /p:CollectCoverage=true /p:CoverletOutput=$(coverageResults) /p:CoverletOutputFormat=cobertura
+- script: dotnet test $(tests) --no-build --no-restore --logger "xunit;LogFileName=TestResults.xml" /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
   displayName: 'dotnet test'
 - task: PublishTestResults@2
   displayName: 'Publish test results'
   inputs:
     testResultsFormat: 'xUnit'
     testResultsFiles: '**/TestResults.xml'
+
 - script: |
-    dotnet tool install dotnet-reportgenerator-globaltool --version 4.0.3 --tool-path .tools
-    ./.tools/reportgenerator "-reports:$(coverageResults)/**/coverage.cobertura.xml" "-targetdir:$(coverageResults)/Reports" "-reporttypes:HtmlInline_AzurePipelines;HTMLChart;Cobertura"
+    dotnet tool install dotnet-reportgenerator-globaltool --version 4.0.3 --tool-path $(toolsPath)
+    $(toolsPath)/reportgenerator "-reports:$(Build.SourcesDirectory)/**/coverage.cobertura.xml" "-targetdir:$(coverageResults)" "-reporttypes:HtmlInline_AzurePipelines;Cobertura"
   displayName: Generate code coverage report
+
 - task: PublishCodeCoverageResults@1
-  displayName: Publish code coverage report
+  displayName: Publish code coverage results
   enabled: true
   inputs:
     codeCoverageTool: Cobertura
-    summaryFileLocation: '$(coverageResults)/Reports/Cobertura.xml'
-    reportDirectory: '$(coverageResults)/Reports'
+    summaryFileLocation: '$(coverageResults)/Cobertura.xml'
+    reportDirectory: '$(coverageResults)'
