@@ -11,12 +11,12 @@ variables:
   tests: '$(Build.SourcesDirectory)/src/Tests/DockerFixtures.Tests/DockerFixtures.Tests.csproj'
   artifacts: '$(Build.SourcesDirectory)/artifacts'
   coverageResults: '$(artifacts)/coverage/'
-  coverageSummary: '$(artifacts)/coverage/summary.xml'
+  coverageSummary: '$(artifacts)/coverage/coverage.xml'
 
 steps:
 - script: dotnet build --configuration $(buildConfiguration) $(sln)
   displayName: 'dotnet build $(buildConfiguration)'
-- script: dotnet test $(tests) --logger "xunit;LogFileName=TestResults.xml" /p:CollectCoverage=true /p:CoverletOutput=$(coverageResults) /p:CoverletOutputFormat='cobertura%2cjson' /p:MergeWith=$(coverageSummary)
+- script: dotnet test $(tests) --logger "xunit;LogFileName=TestResults.xml" /p:CollectCoverage=true /p:CoverletOutput=$(coverageSummary) /p:CoverletOutputFormat=cobertura
   displayName: 'dotnet test'
 - task: PublishTestResults@2
   displayName: 'Publish test results'
@@ -28,7 +28,7 @@ steps:
     dotnet tool install dotnet-reportgenerator-globaltool --version 4.0.3 --tool-path .tools
     ls -la $(coverageResults)
     cat $(coverageSummary)
-    ./.tools/reportgenerator "-reports:$(coverageSummary)" "-targetdir:$(coverageResults)" "-reporttypes:HTMLInline;HTMLChart"
+    ./.tools/reportgenerator "-reports:$(coverageSummary)" "-targetdir:$(coverageResults)" "-reporttypes:HtmlInline_AzurePipelines;HTMLChart"
   displayName: Generate code coverage report
 - task: PublishCodeCoverageResults@1
   displayName: Publish code coverage report
