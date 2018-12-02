@@ -26,6 +26,8 @@ steps:
     testResultsFiles: '**/TestResults.xml'
 
 - script: |
+    apt-get install ttf-mscorefonts-installer
+    fc-cache
     dotnet tool install dotnet-reportgenerator-globaltool --version 4.0.3 --tool-path $(toolsPath)
     $(toolsPath)/reportgenerator "-reports:$(Build.SourcesDirectory)/**/coverage.cobertura.xml" "-targetdir:$(coverageResults)" "-reporttypes:HtmlInline_AzurePipelines;Cobertura;Badges"
   displayName: Generate code coverage report
