@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\Containers\DockerFixtures.Containers.Redis\DockerFixtures.Containers.Redis.csproj" />
+      <ProjectReference Include="..\DockerFixtures.xUnit\DockerFixtures.xUnit.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -13,6 +13,9 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\DockerFixtures\DockerFixtures.csproj" />
+      <ProjectReference Include="..\..\Containers\DockerFixtures.Containers.Redis\DockerFixtures.Containers.Redis.csproj" />      
+      <ProjectReference Include="..\..\DockerFixtures\DockerFixtures.csproj" />      
+      <ProjectReference Include="..\..\Frameworks\xUnit\DockerFixtures.xUnit.Redis\DockerFixtures.xUnit.Redis.csproj" />
+      <ProjectReference Include="..\..\Frameworks\xUnit\DockerFixtures.xUnit\DockerFixtures.xUnit.csproj" />
     </ItemGroup>
 </Project>

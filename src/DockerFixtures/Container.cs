@@ -1,18 +1,21 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Docker.DotNet;
 using Docker.DotNet.Models;
+using DockerFixtures.Configuration;
 using DockerFixtures.Exceptions;
 using DockerFixtures.Infrastructure;
 using Polly;
 
 namespace DockerFixtures
 {
-    public class Container
+    public abstract class Container
     {
+        public ContainerConfiguration Configuration { get; }
         private readonly DockerClient _dockerClient;
         
         private readonly TimeSpan _startTimeout = TimeSpan.FromMinutes(1);
@@ -30,36 +33,10 @@ namespace DockerFixtures
             PublishAllPorts = true     
         };
         
-        /// <summary>
-        /// Docker image name
-        /// </summary>
-        public string ImageName { get; }
-        
-        /// <summary>
-        /// Ports exposed by container
-        /// </summary>
-        public int[] ExposedPorts { get; }
-
-        public (string key, string value)[] EnvironmentVariables { get; }
-        
-        public string[] Commands { get; }
-        
-        public Container()
+        protected Container(ContainerConfiguration configuration)
         {
+            Configuration = configuration;
             _dockerClient = DockerClientFactory.GetClient();
-            
-            ExposedPorts = new int[0];
-            Commands = new string[0];
-            EnvironmentVariables = new (string key, string value)[0];
-        }
-
-        public Container(string imageName)
-            : this()
-        {
-            if (string.IsNullOrWhiteSpace(imageName))
-                throw new ArgumentException("Value cannot be null or whitespace.", nameof(imageName));
-            
-            ImageName = imageName;
         }
         
         public async Task StartAsync()
@@ -112,16 +89,13 @@ namespace DockerFixtures
                 if (m.Error != null)
                     await Console.Error.WriteLineAsync(m.ErrorMessage);
             });
-
-            var tag = ImageName.Contains(":")
-                ? ImageName.Split(new[] {":"}, StringSplitOptions.RemoveEmptyEntries).ToArray().Last()
-                : "latest";
-            
+      
             var imagesCreateParameters = new ImagesCreateParameters
             {
-                FromImage = ImageName,
-                Tag = tag,
+                FromImage = Configuration.ImageName,
+                Tag = Configuration.Tag,
             };
+            
             await _dockerClient.Images.CreateImageAsync(
                 imagesCreateParameters,
                 new AuthConfig(),
@@ -138,11 +112,11 @@ namespace DockerFixtures
         {
             var cfg = new Config
             {
-                Image = ImageName,
-                Env = EnvironmentVariables.Select(ev => $"{ev.key}={ev.value}").ToList(),
-                ExposedPorts = ExposedPorts.ToDictionary(e => $"{e}/tcp", e => default(EmptyStruct)),
+                Image = $"{Configuration.ImageName}:{Configuration.Tag}",
+                Env = Configuration.EnvironmentVariables.Select(ev => $"{ev.key}={ev.value}").ToList(),
+                ExposedPorts = Configuration.ExposedPorts.ToDictionary(e => $"{e}/tcp", e => default(EmptyStruct)),
                 Tty = true,
-                Cmd = Commands,
+                Cmd = Configuration.Commands,
                 AttachStderr = true,
                 AttachStdout= true,
             };
@@ -166,6 +140,43 @@ namespace DockerFixtures
             }
 
             await _dockerClient.Containers.RemoveContainerAsync(_containerInspectResponse.ID, new ContainerRemoveParameters());
+        }
+        
+        protected string GetDockerHostIpAddress()
+        {
+            var dockerHostUri = _dockerClient.Configuration.EndpointBaseUri;
+
+            switch (dockerHostUri.Scheme)
+            {
+                case "http":
+                case "https":
+                case "tcp":
+                    return dockerHostUri.Host;
+                case "npipe": //will have to revisit this for LCOW/WCOW
+                case "unix":
+                    return File.Exists("/.dockerenv") 
+                        ? _containerInspectResponse.NetworkSettings.Gateway
+                        : "localhost";
+                default:
+                    return null;
+            }
+        }
+
+        protected string GetDockerHostExposedPort(int port)
+        {
+            if (!Configuration.ExposedPorts.Any())
+                throw new Exception("Container does not expose any ports.");
+
+            var ports =  _containerInspectResponse.NetworkSettings.Ports;
+
+            var key = $"{port}/tcp";
+
+            if (!ports.TryGetValue(key, out var hostPortMappings))
+            {
+                throw new Exception($"Container does not expose port {port}.");
+            }
+            
+            return hostPortMappings.First().HostPort;
         }
     }
 }
